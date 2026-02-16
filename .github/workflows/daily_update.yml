@@ -1,0 +1,32 @@
+name: Daily Tide Scrape
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs every night at midnight UTC
+  workflow_dispatch: # This adds a "Run" button so you can test it manually
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # This was the error; changed from 'runs-proxy'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: |
+          pip install pandas scikit-learn requests beautifulsoup4
+
+      - name: Run Scraper and Model
+        run: python scraper.py
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name 'TurtleBot'
+          git config --global user.email 'bot@turtle.com'
+          git add forecast.csv
+          git commit -m "Auto-update forecast" || echo "No changes to commit"
+          git push
