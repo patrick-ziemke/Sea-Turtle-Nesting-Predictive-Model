@@ -82,21 +82,35 @@ class EnhancedTurtleForecaster:
         print("✓ Model retrained on historical data.")
 
     def update_forecast(self, forecast_path="forecast.csv"):
-        """Reads forecast.csv, predicts, and saves results back"""
         df_forecast = pd.read_csv(forecast_path)
         df_ready = self._engineer_features(df_forecast)
         
         X = df_ready[self.feature_names]
-        
         pred_rf = self.model_rf.predict(X)
         pred_gb = self.model_gb.predict(X)
         
-        # Weighted Ensemble (60% RF / 40% GB)
-        df_forecast["prediction"] = (pred_rf * 0.6 + pred_gb * 0.4).clip(0).round(1)
+        # 1. Calculate raw prediction
+        raw_pred = (pred_rf * 0.6 + pred_gb * 0.4).clip(0)
+        df_forecast["prediction"] = raw_pred.round(1)
         
-        # Save back to CSV
+        # 2. Calculate 1-10 Viewing Score
+        # We normalize based on a "Great Night" being ~8 nests for this sector
+        def calculate_score(row):
+            # Base score from prediction (0 to 7)
+            score = (row['prediction'] / 8) * 7 
+            
+            # Bonus for High Tide Coefficient (Turtles love high energy water)
+            if row['tide_coefficient'] > 80: score += 1.5
+            
+            # Penalty for too much moon (Harder to see/Turtles more shy)
+            if row['illumination_pct'] > 90: score -= 1.0
+            
+            return min(10, max(1, round(score)))
+
+        df_forecast["viewing_score"] = df_forecast.apply(calculate_score, axis=1)
+        
         df_forecast.to_csv(forecast_path, index=False)
-        print(f"✨ Forecast updated for {len(df_forecast)} days.")
+        print(f"✨ Forecast & 1-10 Scores updated.")
 
 def run_prediction_engine():
     """Main entry point for the daily automation"""
